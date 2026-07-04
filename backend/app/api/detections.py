@@ -5,7 +5,7 @@ Detection API endpoints.
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 from datetime import datetime, timedelta, timezone
-from datetime import datetime, timedelta, timezonefrom app.db.supabase_client import get_supabase
+from app.db.supabase_client import get_supabase
 from app.models.detection import Detection, DetectionCreate
 from app.services.cache_service import CacheService
 

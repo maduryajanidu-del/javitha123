@@ -266,7 +266,7 @@ export default function SettingsPage() {
                 { name: 'Redis', status: 'connected', color: 'var(--severity-low)' },
                 { name: 'Telegram Bot', status: 'configured', color: 'var(--severity-low)' },
                 { name: 'YOLO Model', status: 'loaded', color: 'var(--severity-low)' },
-                { name: 'ESP32-CAM', status: 'waiting', color: 'var(--severity-normal)' },
+                { name: 'Laptop Webcam', status: 'active', color: 'var(--severity-low)' },
               ].map((env) => (
                 <div key={env.name} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',

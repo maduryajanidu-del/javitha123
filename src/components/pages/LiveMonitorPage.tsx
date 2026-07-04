@@ -1,28 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   MonitorPlay, Radio, Shield, Zap, Clock,
   Maximize2, Volume2, RefreshCw
 } from 'lucide-react';
 import type { WSMessage } from '@/lib/websocket';
+import { getRecentDetections, Detection } from '@/lib/api';
 
 interface LiveMonitorPageProps {
   lastMessage: WSMessage | null;
 }
-
-const demoLiveEvents = [
-  { id: 1, time: '18:32:14', type: 'Person', severity: 'critical', camera: 'Track-01', conf: 94 },
-  { id: 2, time: '18:31:52', type: 'Car', severity: 'high', camera: 'Crossing-01', conf: 87 },
-  { id: 3, time: '18:31:08', type: 'Person', severity: 'critical', camera: 'Track-02', conf: 91 },
-  { id: 4, time: '18:30:44', type: 'Dog', severity: 'normal', camera: 'Platform-A', conf: 73 },
-  { id: 5, time: '18:29:15', type: 'Bicycle', severity: 'normal', camera: 'Track-01', conf: 78 },
-  { id: 6, time: '18:28:33', type: 'Truck', severity: 'high', camera: 'Bridge-01', conf: 82 },
-  { id: 7, time: '18:27:01', type: 'Person', severity: 'critical', camera: 'Crossing-01', conf: 96 },
-  { id: 8, time: '18:25:44', type: 'Car', severity: 'high', camera: 'Track-02', conf: 85 },
-  { id: 9, time: '18:24:12', type: 'Motorcycle', severity: 'high', camera: 'Bridge-01', conf: 79 },
-  { id: 10, time: '18:22:55', type: 'Person', severity: 'normal', camera: 'Platform-A', conf: 68 },
-];
 
 const severityColor = (s: string) => {
   const map: Record<string, string> = {
@@ -32,7 +20,30 @@ const severityColor = (s: string) => {
 };
 
 export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
-  const [selectedCamera] = useState('Track-01');
+  const [selectedCamera] = useState('Local Webcam');
+  const [events, setEvents] = useState<Detection[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch initial data
+  useEffect(() => {
+    getRecentDetections(20).then((res) => {
+      setEvents(res.data);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Failed to fetch recent detections', err);
+      setLoading(false);
+    });
+  }, []);
+
+  // Listen to new websocket events
+  useEffect(() => {
+    if (lastMessage?.type === 'new_detection') {
+      const newEvent = lastMessage.payload as Detection;
+      setEvents(prev => [newEvent, ...prev].slice(0, 50));
+    }
+  }, [lastMessage]);
+
+  const snapshots = events.filter(e => e.image_url).slice(0, 5);
 
   return (
     <div className="fade-in">
@@ -42,7 +53,7 @@ export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
           <p className="page-subtitle">Real-time camera feed and detection stream</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary btn-sm">
+          <button className="btn btn-secondary btn-sm" onClick={() => window.location.reload()}>
             <RefreshCw size={14} /> Recheck Stream
           </button>
         </div>
@@ -82,16 +93,25 @@ export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
                 📹 {selectedCamera} • 640×480 • 24 FPS
               </div>
 
-              <div className="live-feed-placeholder">
-                <MonitorPlay size={64} style={{ marginBottom: '16px', opacity: 0.2 }} />
-                <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
-                  Camera Feed: {selectedCamera}
-                </div>
-                <div style={{ fontSize: '13px' }}>
-                  Connect ESP32-CAM to view live stream
-                </div>
-                <div style={{ fontSize: '12px', marginTop: '8px', color: 'var(--accent-blue)' }}>
-                  Waiting for video signal...
+              <div style={{ width: '100%', height: '100%', minHeight: '420px', overflow: 'hidden', borderRadius: 'var(--radius-md)' }}>
+                <img 
+                  src="http://localhost:5000/video_feed" 
+                  alt="Live Camera Feed"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const placeholder = document.getElementById('feed-error-placeholder');
+                    if (placeholder) placeholder.style.display = 'flex';
+                  }}
+                />
+                <div id="feed-error-placeholder" className="live-feed-placeholder" style={{ display: 'none', height: '100%' }}>
+                  <MonitorPlay size={64} style={{ marginBottom: '16px', opacity: 0.2 }} />
+                  <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
+                    Camera Feed: {selectedCamera}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--severity-critical)' }}>
+                    Failed to connect to video stream. Is the AI service running?
+                  </div>
                 </div>
               </div>
             </div>
@@ -104,9 +124,9 @@ export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
                 <Shield size={16} /> Recent Detection Snapshots
               </span>
             </div>
-            <div className="panel-body" style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} style={{
+            <div className="panel-body" style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', minHeight: '130px' }}>
+              {snapshots.map((event) => (
+                <div key={event.id} style={{
                   minWidth: '140px', height: '100px',
                   background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -115,19 +135,36 @@ export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
                   position: 'relative',
                   overflow: 'hidden',
                   transition: 'border-color 0.2s',
+                  backgroundImage: `url(${event.image_url})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
                 }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                    Snapshot {i}
-                  </div>
-                  {i <= 2 && (
+                  {event.severity === 'critical' && (
                     <div style={{
                       position: 'absolute', top: '4px', right: '4px',
                       width: '8px', height: '8px', borderRadius: '50%',
-                      background: i === 1 ? '#ef4444' : '#f97316',
+                      background: '#ef4444',
                     }} />
                   )}
+                  <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    background: 'rgba(0,0,0,0.6)', padding: '2px 4px',
+                    fontSize: '9px', color: '#fff', textAlign: 'center'
+                  }}>
+                    {event.object_type} • {Math.round(event.confidence * 100)}%
+                  </div>
                 </div>
               ))}
+              {snapshots.length === 0 && !loading && (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '20px', width: '100%', textAlign: 'center' }}>
+                  No snapshots yet. Waiting for AI detections...
+                </div>
+              )}
+              {loading && (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '20px', width: '100%', textAlign: 'center' }}>
+                  Loading...
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -144,12 +181,12 @@ export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
               color: 'var(--severity-critical)',
               borderRadius: '10px', fontWeight: 600,
             }}>
-              {demoLiveEvents.length} events
+              {events.length} events
             </span>
           </div>
           <div style={{ maxHeight: '600px', overflow: 'auto' }}>
             <div className="event-timeline" style={{ padding: '4px 0' }}>
-              {demoLiveEvents.map((event) => (
+              {events.map((event) => (
                 <div key={event.id} className="event-item">
                   <div style={{
                     width: '4px', height: '36px', borderRadius: '2px',
@@ -158,7 +195,7 @@ export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {event.type}
+                        {event.object_type.charAt(0).toUpperCase() + event.object_type.slice(1)}
                       </span>
                       <span className={`severity-badge ${event.severity}`} style={{ fontSize: '9px', padding: '1px 6px' }}>
                         {event.severity}
@@ -166,16 +203,26 @@ export default function LiveMonitorPage({ lastMessage }: LiveMonitorPageProps) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <Clock size={10} /> {event.time}
+                        <Clock size={10} /> {new Date(event.event_timestamp).toLocaleTimeString()}
                       </span>
-                      <span>📹 {event.camera}</span>
+                      <span>📹 {selectedCamera}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <Zap size={10} /> {event.conf}%
+                        <Zap size={10} /> {Math.round(event.confidence * 100)}%
                       </span>
                     </div>
                   </div>
                 </div>
               ))}
+              {events.length === 0 && !loading && (
+                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '20px', textAlign: 'center' }}>
+                  No detections recorded yet.
+                </div>
+              )}
+              {loading && (
+                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '20px', textAlign: 'center' }}>
+                  Loading events...
+                </div>
+              )}
             </div>
           </div>
         </div>

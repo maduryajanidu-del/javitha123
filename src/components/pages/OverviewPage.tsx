@@ -35,22 +35,18 @@ const demoObjectData = [
 ];
 
 const demoCameraData = [
-  { name: 'Track-01', count: 38 },
-  { name: 'Track-02', count: 24 },
-  { name: 'Platform-A', count: 19 },
-  { name: 'Bridge-01', count: 11 },
-  { name: 'Crossing-01', count: 8 },
+  { name: 'Laptop Webcam', count: 134 },
 ];
 
 const demoRecentEvents = [
-  { id: '1', time: '18:32:14', type: 'Person', severity: 'critical', camera: 'Track-01', confidence: 0.94 },
-  { id: '2', time: '18:28:41', type: 'Car', severity: 'high', camera: 'Crossing-01', confidence: 0.87 },
-  { id: '3', time: '18:15:22', type: 'Person', severity: 'critical', camera: 'Track-02', confidence: 0.91 },
-  { id: '4', time: '17:52:08', type: 'Dog', severity: 'normal', camera: 'Platform-A', confidence: 0.73 },
-  { id: '5', time: '17:41:33', type: 'Truck', severity: 'high', camera: 'Bridge-01', confidence: 0.82 },
-  { id: '6', time: '17:19:55', type: 'Bicycle', severity: 'normal', camera: 'Track-01', confidence: 0.78 },
-  { id: '7', time: '16:58:12', type: 'Person', severity: 'critical', camera: 'Crossing-01', confidence: 0.96 },
-  { id: '8', time: '16:44:39', type: 'Car', severity: 'high', camera: 'Track-02', confidence: 0.85 },
+  { id: '1', time: '18:32:14', type: 'Person', severity: 'critical', camera: 'Laptop Webcam', confidence: 0.94 },
+  { id: '2', time: '18:28:41', type: 'Car', severity: 'high', camera: 'Laptop Webcam', confidence: 0.87 },
+  { id: '3', time: '18:15:22', type: 'Person', severity: 'critical', camera: 'Laptop Webcam', confidence: 0.91 },
+  { id: '4', time: '17:52:08', type: 'Dog', severity: 'normal', camera: 'Laptop Webcam', confidence: 0.73 },
+  { id: '5', time: '17:41:33', type: 'Truck', severity: 'high', camera: 'Laptop Webcam', confidence: 0.82 },
+  { id: '6', time: '17:19:55', type: 'Bicycle', severity: 'normal', camera: 'Laptop Webcam', confidence: 0.78 },
+  { id: '7', time: '16:58:12', type: 'Person', severity: 'critical', camera: 'Laptop Webcam', confidence: 0.96 },
+  { id: '8', time: '16:44:39', type: 'Car', severity: 'high', camera: 'Laptop Webcam', confidence: 0.85 },
 ];
 
 const demoSystemHealth = [
@@ -94,7 +90,7 @@ export default function OverviewPage({ lastMessage }: OverviewPageProps) {
 
   useEffect(() => {
     // Animate counters on mount
-    const targets = { detections: 134, critical: 12, cameras: 5, avgConf: 87 };
+    const targets = { detections: 134, critical: 12, cameras: 1, avgConf: 87 };
     const duration = 1200;
     const steps = 40;
     const interval = duration / steps;
@@ -155,7 +151,7 @@ export default function OverviewPage({ lastMessage }: OverviewPageProps) {
               <Camera size={18} />
             </div>
           </div>
-          <div className="kpi-card-value">{animatedCounts.cameras}<span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>/6</span></div>
+          <div className="kpi-card-value">{animatedCounts.cameras}<span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>/1</span></div>
           <div className="kpi-card-change positive">
             <Activity size={14} /> All operational
           </div>
