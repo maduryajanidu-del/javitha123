@@ -14,9 +14,7 @@ load_dotenv()  # Also check local .env
 class AIConfig:
     """Configuration for the AI detection pipeline."""
 
-    # Camera
-    CAMERA_STREAM_URL: str = os.getenv("CAMERA_STREAM_URL", "http://192.168.1.100:81/stream")
-    USE_WEBCAM_FALLBACK: bool = os.getenv("USE_WEBCAM_FALLBACK", "true").lower() == "true"
+    # Camera — Laptop Webcam only
     WEBCAM_INDEX: int = int(os.getenv("WEBCAM_INDEX", "0"))
 
     # Model

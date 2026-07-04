@@ -9,6 +9,9 @@ import sys
 import time
 import threading
 from datetime import datetime, timezone
+import cv2
+from flask import Flask, Response
+from flask_cors import CORS
 
 from ai.config import config
 from ai.camera.reader import CameraReader
@@ -19,14 +22,55 @@ from ai.event_filter.event_builder import EventBuilder
 from ai.uploader.storage_uploader import StorageUploader
 from ai.notifier.telegram_notifier import TelegramNotifier
 
-# ── Logging setup ─────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+# ── Logging setup (UTF-8 safe for Windows) ────────────────────
+import io
+_utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+_handler = logging.StreamHandler(_utf8_stdout)
+_handler.setFormatter(logging.Formatter(
+    "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    stream=sys.stdout,
-)
+))
+logging.root.addHandler(_handler)
+logging.root.setLevel(logging.INFO)
 logger = logging.getLogger("railway.main")
+
+# ── Flask Server for Live Video Stream ────────────────────────
+global_frame = None
+global_frame_lock = threading.Lock()
+
+app = Flask(__name__)
+CORS(app)
+
+def generate_frames():
+    global global_frame, global_frame_lock
+    while True:
+        with global_frame_lock:
+            if global_frame is None:
+                frame_to_yield = None
+            else:
+                frame_to_yield = global_frame.copy()
+        
+        if frame_to_yield is None:
+            time.sleep(0.1)
+            continue
+            
+        ret, buffer = cv2.imencode('.jpg', frame_to_yield)
+        if not ret:
+            time.sleep(0.1)
+            continue
+            
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        time.sleep(0.03)
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def run_flask():
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+
 
 
 async def process_event(
@@ -81,7 +125,7 @@ def run_pipeline():
         logger.error("Failed to connect to camera — exiting")
         sys.exit(1)
 
-    logger.info(f"📹 Camera: {camera.source_name}")
+    logger.info(f"📹 Laptop Webcam: {camera.source_name}")
     logger.info(f"🤖 Model: {config.YOLO_MODEL_PATH}")
     logger.info(f"📊 Confidence threshold: {config.CONFIDENCE_THRESHOLD}")
     logger.info(f"⏱️  Processing every {config.PROCESS_EVERY_N_FRAMES} frames")
@@ -96,6 +140,11 @@ def run_pipeline():
 
     t = threading.Thread(target=start_background_loop, args=(event_loop,), daemon=True)
     t.start()
+    
+    # Start Flask Server Thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info("🎥 Live Video Stream started on http://localhost:5000/video_feed")
     total_events = 0
     fps_counter = 0
     fps_timer = time.time()
@@ -120,11 +169,30 @@ def run_pipeline():
 
             # ── Detection ─────────────────────────────────────
             detections = detector.detect(frame)
+            annotated_frame = frame.copy()
+            tracked_objects = []
+
+            if detections:
+                # ── Tracking ──────────────────────────────────────
+                tracked_objects = tracker.update(detections)
+                
+                # Annotate frame for live stream
+                for tracked in tracked_objects:
+                    x1, y1, x2, y2 = tracked.bbox
+                    # Get severity for color
+                    severity = detector.get_severity(tracked.class_name, tracked.confidence)
+                    color = (0, 0, 255) if severity in ("critical", "high") else (0, 255, 0)
+                    cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+                    label = f"{tracked.class_name} {tracked.confidence:.0%}"
+                    cv2.putText(annotated_frame, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+            # Update global frame for stream
+            global global_frame, global_frame_lock
+            with global_frame_lock:
+                global_frame = annotated_frame
+                
             if not detections:
                 continue
-
-            # ── Tracking ──────────────────────────────────────
-            tracked_objects = tracker.update(detections)
 
             # ── Event validation and dispatch ─────────────────
             for tracked in tracked_objects:

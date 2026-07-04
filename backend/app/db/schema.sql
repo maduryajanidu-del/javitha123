@@ -93,3 +93,15 @@ CREATE TRIGGER set_cameras_updated_at
     BEFORE UPDATE ON cameras
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ── Initial Data ─────────────────────────────────────────────
+-- Insert default camera used by local AI inference service
+INSERT INTO cameras (id, name, location, stream_url, status)
+VALUES (
+    '00000000-0000-0000-0000-000000000001', 
+    'Local Webcam', 
+    'Control Room', 
+    'http://localhost', 
+    'online'
+) ON CONFLICT (id) DO NOTHING;
+

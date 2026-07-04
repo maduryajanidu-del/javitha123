@@ -2,9 +2,14 @@
 Application configuration loaded from environment variables.
 """
 
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from typing import Optional
+
+# Resolve the .env path relative to this file (backend/.env)
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -21,8 +26,8 @@ class Settings(BaseSettings):
     telegram_bot_token: str = Field(default="")
     telegram_chat_id: str = Field(default="")
 
-    # ── Camera ──
-    camera_stream_url: str = Field(default="http://192.168.1.100:81/stream")
+    # ── Camera (Laptop Webcam) ──
+    webcam_index: int = Field(default=0)
 
     # ── AI Model ──
     yolo_model_path: str = Field(default="yolo11n.pt")
@@ -36,7 +41,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8000)
     debug: bool = Field(default=True)
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+    model_config = {"env_file": str(_ENV_FILE), "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()
